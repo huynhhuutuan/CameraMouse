@@ -7,50 +7,50 @@ from threading import Thread
 __author__ = 'rbanalagay'
 
 
-class OverlayWindow(QtWidgets.QMainWindow):
-    def __init__(self):
-        QtWidgets.QMainWindow.__init__(self)
-        self.setWindowFlags(
-            QtCore.Qt.WindowStaysOnTopHint |
-            QtCore.Qt.FramelessWindowHint |
-            QtCore.Qt.X11BypassWindowManagerHint
-            )
-        self.setGeometry(QtWidgets.QStyle.alignedRect(
-            QtCore.Qt.LeftToRight, QtCore.Qt.AlignCenter,
-            QtCore.QSize(220, 32),
-            QtWidgets.qApp.desktop().availableGeometry()))
-
-    def mousePressEvent(self, event):
-        QtWidgets.qApp.quit()
-
-
 OFFSET = 200
 COLOR = (0, 0, 255)
 cap = cv2.VideoCapture(0)
 img = np.ones((1920, 1080, 3), np.uint8) * 255
-cv2.rectangle(img, (300, 300), (800, 800), COLOR, 10)
-# cv2.rectangle(img, (OFFSET + 0, OFFSET + 0), (OFFSET + 20, OFFSET + 20), COLOR, -1)
-# cv2.rectangle(img, (OFFSET + 490, OFFSET + 490), (OFFSET + 510, OFFSET + 510), COLOR, -1)
-# cv2.rectangle(img, (OFFSET + 0, OFFSET + 490), (OFFSET + 20, OFFSET + 510), COLOR, -1)
-# cv2.rectangle(img, (OFFSET + 490, OFFSET + 0), (OFFSET + 510, OFFSET + 20), COLOR, -1)
+cv2.rectangle(img, (OFFSET, OFFSET), (OFFSET+495, OFFSET+495), COLOR, 10)
+# cv2.rectangle(img, (OFFSET + 0, OFFSET + 0), (OFFSET + 5, OFFSET + 5), COLOR, -1)
+# cv2.rectangle(img, (OFFSET + 490, OFFSET + 490), (OFFSET + 495, OFFSET + 495), COLOR, -1)
+# cv2.rectangle(img, (OFFSET + 0, OFFSET + 490), (OFFSET + 5, OFFSET + 495), COLOR, -1)
+# cv2.rectangle(img, (OFFSET + 490, OFFSET + 0), (OFFSET + 495, OFFSET + 5), COLOR, -1)
 kernel = np.ones((5,5),np.uint8)
 
+
 def start_camera():
+    target_lines = 20
+    min_vote_count = 70
+
     while True:
         ret, frame = cap.read()
 
-        mask = cv2.inRange(frame, (17, 15, 100), (100, 100, 255))
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        lines = cv2.HoughLines(mask, 1, (np.pi/180), 100)
-        print(lines)
+        # gray = frame[:, :, 2]
+        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        # gray = clahe.apply(gray)
+        mask = cv2.inRange(hsv, (160, 50, 50), (179, 255, 255))
+        mask2 = cv2.inRange(hsv, (0, 50, 50), (10, 255, 255))
+        mask = cv2.add(mask, mask2)
+        #
+        # edges = cv2.Canny(gray,100,150)
+        lines = cv2.HoughLines(mask, 1, (np.pi/180), round(min_vote_count))
+
+        # lines = cv2.HoughLinesP(edges, 1, (np.pi/180), 70, 100, 0)
         # mask = cv2.medianBlur(mask, 3)
         # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         # Our operations on the frame come here
         # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-
         if lines is not None:
-            for line in lines[0:10]:
+            if len(lines) < target_lines / 2:
+                min_vote_count /= 2
+            elif len(lines) > target_lines * 2:
+                min_vote_count *= 2
+            for line in lines:
+
                 for rho, theta in line:
                     a = np.cos(theta)
                     b = np.sin(theta)
@@ -61,7 +61,12 @@ def start_camera():
                     x2 = int(x0 - 1000*(-b))
                     y2 = int(y0 - 1000*(a))
 
-                    cv2.line(frame,(x1,y1),(x2,y2),(0,0,255), 2)
+                # x1, y1, x2, y2 = line[0]
+                cv2.line(frame,(x1,y1),(x2,y2),(0,255,0), 2)
+
+        #     print(len(lines))
+        # else:
+        #     min_vote_count /= 2
 
 
         # Display the resulting frame
